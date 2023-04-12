@@ -18,7 +18,7 @@ def generate_data(split):
         split = "test"
     os.makedirs(output_dir+split, exist_ok=True)
     new_data = {"type": "chat_list", "instances": []}
-    for d in data[:100]:
+    for d in data:
         if d["fields"] == "": continue
         new_data["instances"].append({"chat":d})
     # with open(output_dir + f"{split}/{split}_{len(new_data['instances'])}.json", "w") as f:
