@@ -11,6 +11,7 @@ Face dataset, mapping datasets, and retrieving the backend dataset and arguments
 
 # Importing necessary libraries and modules
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +23,7 @@ from lmflow.args import DatasetArguments
 DATASET_TYPES = [
     "text_only",
     "text2text",
+    "chat_list"
 ]
 
 KEY_TYPE = "type"
@@ -102,6 +104,27 @@ class Dataset:
         else:
             raise NotImplementedError(f'Unsupported dataset backend "{backend}"')
 
+    def log_examples(self, num_examples: int=3):
+        r"""
+        Log the first few examples from the dataset.
+
+        Parameters
+        ------------
+
+        num_examples : int, default=5
+            The number of examples to log.
+        """
+        if self.backend == "huggingface":
+            if int(os.getenv("LOCAL_RANK", "-1")) <= 0:
+                for i in range(num_examples):
+                    print(f"Dataset example {i}: {self.backend_dataset[i]}")
+        else:
+            raise NotImplementedError(
+                f'Currently .log_examples is not supported for backend "{backend}"'
+            )
+
+    def clean_empty_example(self, examples):
+        return [x for x in examples if x['fields']!=""]
 
     def _check_data_type(self):
         # TODO: check if data type and data structure matches, raise messages

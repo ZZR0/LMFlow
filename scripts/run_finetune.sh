@@ -2,6 +2,7 @@
 # Please run this script under ${project_id} in project directory of
 #   https://github.com/shizhediao/llm-ft
 #     COMMIT: d5fecf30ba8011067b10cf51fede53a5ab6574e4
+export WANDB_MODE=offline
 
 deepspeed_args="--master_port=11000"      # Default argument
 if [ $# -ge 1 ]; then
@@ -13,7 +14,7 @@ project_dir=$(cd "$(dirname $0)"/..; pwd)
 output_dir=${project_dir}/output_models/${exp_id}
 log_dir=${project_dir}/log/${exp_id}
 
-dataset_path=${project_dir}/data/alpaca/train
+dataset_path=${project_dir}/data/koala/train
 
 mkdir -p ${output_dir} ${log_dir}
 

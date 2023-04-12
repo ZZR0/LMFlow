@@ -21,6 +21,9 @@ from lmflow.models.hf_decoder_model import HFDecoderModel
 from lmflow.utils.data_utils import set_random_seed, batchlize, answer_extraction
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # To avoid warnings about parallelism in tokenizers
 
+FIELD_KEY = "fields"
+
+
 class Inferencer(BasePipeline):
     """
     Initializes the `Inferencer` class with given arguments.
@@ -67,7 +70,15 @@ class Inferencer(BasePipeline):
 
     def create_dataloader(self, dataset: Dataset):
         data_dict = dataset.to_dict()
-        inputs = [ instance["text"] for instance in data_dict["instances"] ]
+        if dataset.get_type() == "text_only":
+            inputs = [ instance["text"] for instance in data_dict["instances"] ]
+        elif dataset.get_type() == "chat_list":
+            inputs = [ instance["chat"] for instance in data_dict["instances"] ]
+        else:
+            raise NotImplementedError(
+                'input dataset should have type "text_only" or "chat_list"'
+            )
+            
         dataset_size = len(inputs)
         dataset_buf = []
         for idx in range(dataset_size):
@@ -107,9 +118,37 @@ class Inferencer(BasePipeline):
 
         output_dataset: Dataset object.
         """
-        if dataset.get_type() != "text_only":
+        def format_prompt(input, prompt_structure):
+            if FIELD_KEY in input:
+                prompted_input = ""
+                fields = input[FIELD_KEY].split(',')
+
+                for i, field in enumerate(fields):
+                    if field.startswith('[') and field.endswith(']'):
+                        # No loss for this field.
+                        field = field[1:-1]
+
+                    if field == '<|bos|>':
+                        prompted_input += self.tokenizer.bos_token
+                    elif field == '<|eos|>':
+                        prompted_input += self.tokenizer.eos_token
+                    else:
+                        subfields = field.split('+')
+                        text = ' '.join(
+                            [input[subfield] for subfield in subfields]
+                        )
+                        if i == 0:
+                            text = '' + text
+                        prompted_input += text
+
+                if True:
+                    prompted_input += self.tokenizer.eos_token
+                return prompted_input
+            return prompt_structure.format(input)
+            
+        if dataset.get_type() not in ["text_only", "chat_list"]:
             raise NotImplementedError(
-                'input dataset should have type "text_only"'
+                'input dataset should have type "text_only" or "chat_list"'
             )
 
         dataloader, data_size = self.create_dataloader(dataset)
@@ -124,7 +163,9 @@ class Inferencer(BasePipeline):
         for batch_index, batch in enumerate(dataloader):
             current_batch = batch[0]        # batch size is 1
 
+            input = format_prompt(current_batch['input'], prompt_structure)
             input = prompt_structure.format(input=current_batch['input'])
+            input = input[-model.get_max_length():]     # Memory of the bot
 
             if self.inferencer_args.device == "gpu":
                 inputs = model.encode(input, return_tensors="pt").to(device=self.local_rank)
@@ -143,9 +184,18 @@ class Inferencer(BasePipeline):
             text_out = model.decode(outputs[0], skip_special_tokens=True)
 
             # only return the generation, trucating the input
-            prompt_length = len(model.decode(inputs[0], skip_special_tokens=True,))
-            text_out = text_out[prompt_length:]
-            output_dict["instances"].append({ "text": text_out })
+            if dataset.get_type() == "text_only":
+                prompt_length = len(model.decode(inputs[0], skip_special_tokens=True,))
+                text_out = text_out[prompt_length:]
+                output_dict["instances"].append({ "text": text_out })
+            elif dataset.get_type() == "chat_list":
+                idx = len(output_dict["instances"][-1])
+                output_dict["instances"][-1][f"gpt_{idx}"] = text_out
+                output_dict["instances"][-1][FIELD_KEY] += f",gpt_{idx},<|eos|>"
+            else:
+                raise NotImplementedError(
+                    'input dataset should have type "text_only" or "chat_list"'
+                )
 
         output_dataset = Dataset(DatasetArguments(dataset_path = None))
         output_dataset = output_dataset.from_dict(output_dict)

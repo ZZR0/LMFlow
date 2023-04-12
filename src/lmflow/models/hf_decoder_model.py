@@ -278,17 +278,64 @@ class HFDecoderModel(DecoderModel, Tunable):
         # logger loading before tokenize_function
         tok_logger = transformers.utils.logging.get_logger("transformers.tokenization_utils_base")
 
+        def tokenize_one(example):
+            output = {}                
+            input_ids = []
+            input_text = ""
+            label_ids = []
+            fields = example["fields"].split(',')
 
+            for i, field in enumerate(fields):
+                if field.startswith('[') and field.endswith(']'):
+                    # No loss for this field.
+                    field = field[1:-1]
+                    mask = True
+                else:
+                    mask = False
+
+                if field == '<|bos|>':
+                    ids = self.tokenizer.bos_token_id
+                    input_ids.append(ids)
+                    label_ids.append(-100 if mask else ids)
+                elif field == '<|eos|>':
+                    ids = self.tokenizer.eos_token_id
+                    input_ids.append(ids)
+                    label_ids.append(-100 if mask else ids)
+                else:
+                    subfields = field.split('+')
+                    text = ' '.join(
+                        [example[subfield] for subfield in subfields]
+                    )
+                    if i == 0:
+                        text = '' + text
+                    tokens = self.tokenizer.encode(text)
+                    input_ids.extend(tokens)
+                    label_ids.extend([-100 if mask else token for token in tokens])
+                    input_text += text
+
+            if True:
+                ids = self.tokenizer.eos_token_id
+                input_ids.append(ids)
+                label_ids.append(ids)
+
+            output["input_ids"] = input_ids
+            output["labels"] = label_ids
+
+            return output
 
         def tokenize_function(examples):
             with CaptureLogger(tok_logger) as cl:
-                if not model_args.use_lora:
-                    output = self.tokenizer(examples[text_column_name])
+                if text_column_name == "chat":
+                    output = [tokenize_one(e) for e in examples[text_column_name]]
+                    output = {k: [d[k] for d in output] for k in output[0]}
                 else:
-                    output = self.tokenizer(
-                        examples[text_column_name],
-                        truncation=True,
-                    )
+                    if not model_args.use_lora:
+                        output = self.tokenizer(examples[text_column_name])
+                    else:
+                        output = self.tokenizer(
+                            examples[text_column_name],
+                            truncation=True,
+                        )
             # clm input could be much much longer than block_size
             if "Token indices sequence length is longer than the" in cl.out:
                 tok_logger.warning(

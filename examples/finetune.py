@@ -57,6 +57,7 @@ def main():
     # Tokenization and text grouping must be done in the main process
     with pipeline_args.main_process_first(desc="dataset map tokenization"):
         tokenized_dataset = model.tokenize(dataset)
+        tokenized_dataset.log_examples()
         lm_dataset = finetuner.group_text(
             tokenized_dataset,
             model_max_length=model.get_max_length(),
