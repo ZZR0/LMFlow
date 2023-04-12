@@ -129,9 +129,9 @@ class Inferencer(BasePipeline):
                         field = field[1:-1]
 
                     if field == '<|bos|>':
-                        prompted_input += self.tokenizer.bos_token
+                        prompted_input += model.tokenizer.bos_token
                     elif field == '<|eos|>':
-                        prompted_input += self.tokenizer.eos_token
+                        prompted_input += model.tokenizer.eos_token
                     else:
                         subfields = field.split('+')
                         text = ' '.join(
@@ -142,7 +142,7 @@ class Inferencer(BasePipeline):
                         prompted_input += text
 
                 if True:
-                    prompted_input += self.tokenizer.eos_token
+                    prompted_input += model.tokenizer.eos_token
                 return prompted_input
             return prompt_structure.format(input)
             
