@@ -5,6 +5,8 @@
 
 import logging
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../src")
 from dataclasses import dataclass, field
 from typing import Optional
 

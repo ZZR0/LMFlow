@@ -3,6 +3,9 @@
 # Copyright 2023 Statistics and Machine Learning Research Group at HKUST. All rights reserved.
 """A simple shell chatbot implemented with lmflow APIs.
 """
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../src")
 import logging
 import json
 import warnings

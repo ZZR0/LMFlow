@@ -14,8 +14,9 @@ Typical usage example:
   bar = foo.FunctionBar()
 """
 
+import os
 import sys
-
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../src")
 from transformers import HfArgumentParser
 
 from lmflow.args import (
