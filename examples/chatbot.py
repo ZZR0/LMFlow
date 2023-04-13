@@ -108,9 +108,7 @@ def main():
             "marker_user": "USER:",
             "marker_gpt": "GPT:",
             "marker_gpt_bad": "An Unhelpful Answer:",
-            "human_1": "Please write a summary of the following paragraph: I am 23 years old, male. My ex-girlfriend is 25. 4 years ago we had a really intense, short relationship, 8 months long. I don't know what love is, but I definitely thought I was in love with her at the time. I feel like we had a very strong emotional connection. However, we both had some serious issues. I was using a lot of drugs. She became very dependent on me for her own well-being and that made me want to distance myself. I broke up with her and it was very hard for her.\n\nI got sober, and a couple of years ago I realized I might be gay. Things made a lot of sense, I thought I was bisexual before but that I could control who I was attracted to. I really didn't want to be with guys so I thought I could just ignore that part of me.\n\nI felt a lot of reluctance to come out because I did have some great sexy times with my ex-GF early in our relationship. But I had a lot of hangups as well. A lot of anxiety surrounding sex.\n\nJust recently I sent my ex-GF an email telling her that I'm pretty sure I'm gay and she told me she was really happy for me and that she thought she had ruined her one chance of true love but really the relationship wouldn't have worked anyways, because I'm gay. That's awesome, and I'm stoked for her that she can have some closure.\n\nAnd so we were planning to meet up and talk. I do really like her and I'm excited. It feels like we are going to be reunited. But now all of a sudden I feel attraction to her, sexual attraction. I want to lay in bed naked with her and have intimate sex.\n\nI feel very confused. I don't want to hurt her but I feel like I want to explore these feelings too. My gut tells me that I shouldn't even tell her about these feelings because I don't want to be in a relationship with her, because I still need to explore the side of me that is attracted to guys. I want to be honest with her as well.",
-            "gpt_1": "I was in a relationship with a girl. She became very dependent on me and I broke up with her. I realized I was gay. I feel sexual attraction to my ex-GF and I don't know about the relationship. I feel confused and freaked out.",
-            "fields": "[marker_user+human_1+marker_gpt],gpt_1,<|eos|>"
+            "fields": ""
             }
 
     end_string = chatbot_args.end_string
@@ -157,7 +155,7 @@ def main():
                 break
             
         print("Bot: " + response, end="\n")
-                
+        print("Context:", context)
 
 
 if __name__ == "__main__":

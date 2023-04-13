@@ -2,7 +2,7 @@
 
 project_dir=$(cd "$(dirname $0)"/..; pwd)
 
-model=${project_dir}/models/llama-7b-hf
+model=${project_dir}/$1
 lora_args=""
 if [ $# -ge 1 ]; then
   model=$1

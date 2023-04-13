@@ -140,7 +140,6 @@ class Inferencer(BasePipeline):
                         if i == 0:
                             text = '' + text
                         prompted_input += text
-
                 if True:
                     prompted_input += model.tokenizer.eos_token
                 return prompted_input
@@ -154,17 +153,12 @@ class Inferencer(BasePipeline):
         dataloader, data_size = self.create_dataloader(dataset)
 
         # The output dataset
-        output_dict = {
-            "type": "text_only",
-            "instances": [
-            ]
-        }
+        output_dict = dataset.to_dict()
 
         for batch_index, batch in enumerate(dataloader):
             current_batch = batch[0]        # batch size is 1
 
             input = format_prompt(current_batch['input'], prompt_structure)
-            input = prompt_structure.format(input=current_batch['input'])
             input = input[-model.get_max_length():]     # Memory of the bot
 
             if self.inferencer_args.device == "gpu":
@@ -185,13 +179,19 @@ class Inferencer(BasePipeline):
 
             # only return the generation, trucating the input
             if dataset.get_type() == "text_only":
+                output_dict = {
+                        "type": "text_only",
+                        "instances": [
+                        ]
+                    }
                 prompt_length = len(model.decode(inputs[0], skip_special_tokens=True,))
                 text_out = text_out[prompt_length:]
                 output_dict["instances"].append({ "text": text_out })
             elif dataset.get_type() == "chat_list":
-                idx = len(output_dict["instances"][-1])
-                output_dict["instances"][-1][f"gpt_{idx}"] = text_out
-                output_dict["instances"][-1][FIELD_KEY] += f",gpt_{idx},<|eos|>"
+                idx = len(output_dict["instances"][-1]["chat"])
+                output_dict["instances"][-1]["chat"][f"gpt_{idx}"] = text_out
+                output_dict["instances"][-1]["chat"][FIELD_KEY] += f",gpt_{idx},<|eos|>"
+                
             else:
                 raise NotImplementedError(
                     'input dataset should have type "text_only" or "chat_list"'
