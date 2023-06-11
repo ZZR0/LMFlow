@@ -30,6 +30,7 @@ DATASET_TYPES = [
     "text_only",
     "text2text",
     "float_only",
+    "text2label",
 ]
 
 KEY_TYPE = "type"

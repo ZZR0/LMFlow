@@ -43,6 +43,7 @@ from transformers import (
     AutoConfig,
     AutoTokenizer,
     AutoModelForCausalLM,
+    AutoModelForTokenClassification
 )
 
 from lmflow.datasets.dataset import Dataset
@@ -186,8 +187,50 @@ class HFDecoderModel(DecoderModel, Tunable):
                         f"Model \"{config.architectures}\" does not support"
                         " flash attention, use normal attention layer instead"
                     )
-                    
-        if tune_strategy == 'normal':
+        
+        if tune_strategy == 'seqcla':
+            if model_args.model_name_or_path:
+                model = AutoModelForTokenClassification.from_pretrained(
+                    model_args.model_name_or_path,
+                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                    config=config,
+                    cache_dir=model_args.cache_dir,
+                    revision=model_args.model_revision,
+                    use_auth_token=True if model_args.use_auth_token else None,
+                    torch_dtype=torch_dtype,
+                )
+            else:
+                model = AutoModelForTokenClassification.from_config(config)
+                n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+                logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+            self.backend_model_full = model
+            if model_args.use_lora:
+                if model_args.lora_target_modules:
+                    lora_target_modules = model_args.lora_target_modules
+                else:
+                    lora_target_modules = None
+                peft_config = LoraConfig(
+                    task_type=TaskType.CAUSAL_LM,
+                    inference_mode=False,
+                    r=model_args.lora_r,
+                    lora_alpha=model_args.lora_alpha,
+                    lora_dropout=model_args.lora_dropout,
+                    target_modules=lora_target_modules,
+                )
+                model = get_peft_model(model, peft_config)
+                model.print_trainable_parameters()
+
+            # We resize the embeddings only when necessary to avoid index errors.
+            # If you are creating a model from scratch on a small vocab and want a
+            # smaller embedding size, remove this test.
+            embedding_size = model.get_input_embeddings().weight.shape[0]
+            if len(tokenizer) > embedding_size:
+                model.resize_token_embeddings(len(tokenizer))
+
+            self.config = config
+            self.backend_model = model
+            self.tune_strategy = tune_strategy
+        elif tune_strategy == 'normal':
             if model_args.model_name_or_path:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_args.model_name_or_path,
@@ -364,6 +407,10 @@ class HFDecoderModel(DecoderModel, Tunable):
             tokenized_column_order = ["input", "output"]
             label_columns = ["output"]
             add_special_tokens = False
+        elif dataset_type == "text2label":
+            tokenized_column_order = ["input"]
+            label_columns = ["label"]
+            add_special_tokens = False
         else:
             raise NotImplementedError(
                 f"dataset type \"{dataset_type}\" is not supported, currently"
@@ -389,21 +436,13 @@ class HFDecoderModel(DecoderModel, Tunable):
                 "labels": [[] for _ in range(num_example)],
             }
             with CaptureLogger(tok_logger) as cl:
-                for column_name in tokenized_column_order:
+                if dataset_type == "text2label":
                     encoding = self.tokenizer(
-                        examples[column_name],
+                        examples["input"],
                         add_special_tokens=add_special_tokens,
-                        truncation=True if model_args.use_lora else None,
+                        truncation=None,
                     )
-
-                    if column_name in label_columns:
-                        labels = encoding["input_ids"].copy()
-                    else:
-                        labels = [
-                            [-100] * len(encoding["input_ids"][i])
-                             for i in range(num_example)
-                        ]
-
+                    labels = examples["label"]
                     for i in range(num_example):
                         token_dict["input_ids"][i].extend(
                             encoding["input_ids"][i]
@@ -412,6 +451,33 @@ class HFDecoderModel(DecoderModel, Tunable):
                             encoding["attention_mask"][i]
                         )
                         token_dict["labels"][i].extend(labels[i])
+                else:
+                    for idx, column_name in enumerate(tokenized_column_order):
+                        if idx == len(tokenized_column_order) - 1 and True:
+                            texts = [text+self.tokenizer.eos_token for text in texts]
+                        
+                        encoding = self.tokenizer(
+                            examples[column_name],
+                            add_special_tokens=add_special_tokens,
+                            truncation=True if model_args.use_lora else None,
+                        )
+
+                        if column_name in label_columns:
+                            labels = encoding["input_ids"].copy()
+                        else:
+                            labels = [
+                                [-100] * len(encoding["input_ids"][i])
+                                for i in range(num_example)
+                            ]
+
+                        for i in range(num_example):
+                            token_dict["input_ids"][i].extend(
+                                encoding["input_ids"][i]
+                            )
+                            token_dict["attention_mask"][i].extend(
+                                encoding["attention_mask"][i]
+                            )
+                            token_dict["labels"][i].extend(labels[i])
 
             # clm input could be much much longer than block_size
             if "Token indices sequence length is longer than the" in cl.out:

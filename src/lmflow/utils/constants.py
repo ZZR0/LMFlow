@@ -161,10 +161,12 @@ DATASET_DESCRIPTION_MAP = {
     "text_only": TEXT_ONLY_DATASET_DESCRIPTION,
     "text2text": TEXT2TEXT_DATASET_DESCRIPTION,
     "float_only": FLOAT_ONLY_DATASET_DESCRIPTION,
+    "text2label": "Token Classification Dataset.",
 }
 
 INSTANCE_FIELDS_MAP = {
     "text_only": ["text"],
     "text2text": ["input", "output"],
     "float_only": ["value"],
+    "text2label": ["input", "label"],
 }
